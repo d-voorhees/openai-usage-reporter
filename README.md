@@ -93,6 +93,13 @@ GitHub Actions cron doesn't adjust for daylight saving automatically, so this dr
 
 Flip the value in `.github/workflows/daily-report.yml` when the clocks change, or adjust it for your own timezone if you're not on Mountain Time.
 
+## Troubleshooting
+
+If the test run in the Actions tab fails, check the run's log for these two common cases:
+
+- **401 from OpenAI**: your API key doesn't have access to the legacy `/v1/usage` and `/v1/dashboard/billing/subscription` endpoints. Try an admin-scoped key from your org's settings, or migrate `report.py` to OpenAI's newer Usage/Costs API.
+- **SMTP authentication error**: double check `EMAIL_PASSWORD` — most providers (Gmail included) require an app password rather than your normal account password. Also confirm `SMTP_PORT` matches your provider (`465` for implicit SSL, `587` for STARTTLS) — a mismatched port produces a connection or auth error rather than a clear "wrong port" message.
+
 ## Tests
 
 This project does not include an automated test suite yet. For a small personal tool, the most useful next step is usually to add mocked tests around the API calls and email formatting before expanding the feature set.
