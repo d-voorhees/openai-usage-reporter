@@ -102,16 +102,3 @@ This project does not include an automated test suite yet. For a small personal 
 This stays intentionally small. A serverless workflow is easier to maintain than a hosted app for a one-job utility, and a plain email report is cheaper and less distracting than a dashboard.
 
 The current implementation assumes one sender account and one recipient. That keeps the setup simple and avoids turning a utility script into a mini platform.
-
-## Scope
-
-This project does not try to:
-
-- Build a web dashboard.
-- Track usage per end user or per API key.
-- Replace the OpenAI dashboard.
-- Provide budget enforcement or blocking.
-
-## License
-
-Add the license that matches how you want to share the project. For a portfolio repo, MIT is a common choice if you want it to stay easy to reuse.
