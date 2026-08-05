@@ -2,7 +2,7 @@
 
 This project runs a daily OpenAI API usage check and sends an email with the numbers. It uses GitHub Actions as a free scheduler and avoids any extra infrastructure.
 
-Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026/08/05/how-i-built-a-free-daily-openai-usage-email-report/)
+Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026/08/05/how-i-built-a-free-daily-openai-usage-email-report/?utm_source=github&utm_medium=referral&utm_campaign=openai-usage-reporter)
 
 ## What it does
 
