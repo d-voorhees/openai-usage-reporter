@@ -2,7 +2,7 @@
 
 This project runs a daily OpenAI API usage check and sends an email with the numbers. It uses GitHub Actions as a free scheduler and avoids any extra infrastructure.
 
-Companion post: [How I Built a Free Daily OpenAI Usage Email Report](https://dvoorhees.com/2026/08/05/how-i-built-a-free-daily-openai-usage-email-report/)
+Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026/08/05/how-i-built-a-free-daily-openai-usage-email-report/)
 
 ## What it does
 
@@ -102,3 +102,7 @@ This project does not include an automated test suite yet. For a small personal 
 This stays intentionally small. A serverless workflow is easier to maintain than a hosted app for a one-job utility, and a plain email report is cheaper and less distracting than a dashboard.
 
 The current implementation assumes one sender account and one recipient. That keeps the setup simple and avoids turning a utility script into a mini platform.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
