@@ -6,7 +6,7 @@ Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026
 
 ## What it does
 
-- Queries the OpenAI billing API for today's usage.
+- Queries OpenAI's Costs API for today's usage.
 - Formats a short plain-text report.
 - Sends the report to a configured email address.
 - Runs on a cron schedule inside GitHub Actions.
@@ -24,12 +24,16 @@ Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026
 
 ## Setup
 
+> [!IMPORTANT]
+> `OPENAI_API_KEY` must be an **admin API key** (`sk-admin-...`), not a regular project key (`sk-proj-...`). Regular project keys cannot read the Costs API and will fail with a 400 or 401 error. Generate one at **[platform.openai.com/settings/organization/admin-keys](https://platform.openai.com/settings/organization/admin-keys)** — you must be the org owner (or have an admin role) to see that page.
+
 1. Fork or clone this repository — `report.py`, `requirements.txt`, and the workflow file are already included.
-2. Add the six repository secrets (see [Environment variables](#environment-variables)):
+2. Generate an admin API key at [platform.openai.com/settings/organization/admin-keys](https://platform.openai.com/settings/organization/admin-keys) (see the note above — this is not the same as a normal API key).
+3. Add the six repository secrets (see [Environment variables](#environment-variables)):
    - On GitHub, go to **Settings → Secrets and variables → Actions → New repository secret**.
-   - Add `OPENAI_API_KEY`, `EMAIL_FROM`, `EMAIL_TO`, `EMAIL_PASSWORD`, `SMTP_HOST`, and `SMTP_PORT`, one at a time.
-3. Test it: go to the **Actions** tab, select **Daily OpenAI Usage Report**, click **Run workflow**, and confirm the email arrives.
-4. If it works, you're done — the workflow runs automatically on the cron schedule below.
+   - Add `OPENAI_API_KEY` (the admin key from step 2), `EMAIL_FROM`, `EMAIL_TO`, `EMAIL_PASSWORD`, `SMTP_HOST`, and `SMTP_PORT`, one at a time.
+4. Test it: go to the **Actions** tab, select **Daily OpenAI Usage Report**, click **Run workflow**, and confirm the email arrives.
+5. If it works, you're done — the workflow runs automatically on the cron schedule below.
 
 To run it locally instead of (or before) pushing to GitHub:
 
@@ -45,7 +49,7 @@ pip install -r requirements.txt
 
 Set these as GitHub Actions secrets and, if you test locally, as environment variables.
 
-- `OPENAI_API_KEY`: Your OpenAI API key with billing access. This script calls the legacy `/v1/usage` and `/v1/dashboard/billing/subscription` endpoints — if your key returns a 401, you may need an admin-scoped key or to switch to OpenAI's newer Usage/Costs API endpoints.
+- `OPENAI_API_KEY`: An **admin API key** (`sk-admin-...`) — **not** a regular project key (`sk-proj-...`). This script calls the `/v1/organization/costs` endpoint, which requires `api.usage.read` scope that only admin keys carry. Generate one at [platform.openai.com/settings/organization/admin-keys](https://platform.openai.com/settings/organization/admin-keys) (org owner/admin role required to see that page).
 - `EMAIL_FROM`: The sender address for your SMTP account.
 - `EMAIL_TO`: The destination email address.
 - `EMAIL_PASSWORD`: The password (or app password, if your provider requires one) for the sender account.
@@ -95,9 +99,9 @@ Flip the value in `.github/workflows/daily-report.yml` when the clocks change, o
 
 ## Troubleshooting
 
-If the test run in the Actions tab fails, check the run's log for these two common cases:
+If the test run in the Actions tab fails, check the run's log for these common cases:
 
-- **401 from OpenAI**: your API key doesn't have access to the legacy `/v1/usage` and `/v1/dashboard/billing/subscription` endpoints. Try an admin-scoped key from your org's settings, or migrate `report.py` to OpenAI's newer Usage/Costs API.
+- **400 or 401 from OpenAI**: `OPENAI_API_KEY` isn't an admin-scoped key. Regular project keys (`sk-proj-...`) can't read `/v1/organization/costs` — generate an admin key from your org's settings and use that instead.
 - **SMTP authentication error**: double check `EMAIL_PASSWORD` — most providers (Gmail included) require an app password rather than your normal account password. Also confirm `SMTP_PORT` matches your provider (`465` for implicit SSL, `587` for STARTTLS) — a mismatched port produces a connection or auth error rather than a clear "wrong port" message.
 
 ## Tests
