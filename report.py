@@ -40,7 +40,7 @@ def get_cost(start_time, end_time):
 
         for bucket in payload.get("data", []):
             for result in bucket.get("results", []):
-                total += result.get("amount", {}).get("value", 0)
+                total += float(result.get("amount", {}).get("value", 0) or 0)
 
         if payload.get("has_more"):
             page = payload.get("next_page")
