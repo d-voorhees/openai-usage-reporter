@@ -6,8 +6,8 @@ Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026
 
 ## What it does
 
-- Queries OpenAI's Costs API for today's usage.
-- Formats a short plain-text report.
+- Queries OpenAI's Costs API for yesterday's usage and month-to-date usage.
+- Formats a short report (plain text + HTML, with bold section headers) stating the exact date/time period each total covers.
 - Sends the report to a configured email address.
 - Runs on a cron schedule inside GitHub Actions.
 
@@ -57,6 +57,14 @@ Set these as GitHub Actions secrets and, if you test locally, as environment var
 - `SMTP_PORT`: The SMTP port. Use `587` (STARTTLS) unless your provider requires implicit SSL on `465`.
 
 This project connects to whatever SMTP server you point it at — it isn't tied to Gmail. If you want to use Gmail anyway, see [Using Gmail](#using-gmail) below.
+
+## Report format
+
+- **Subject**: always `OpenAI API Usage Report`.
+- **Body**: sent as both plain text and HTML (most email clients show the HTML version, with **bold** section headers — `OpenAI API Usage Report`, `Yesterday's Usage`, `This Month's Usage`). Clients that can't render HTML fall back to the plain-text version, which has the same content unbolded.
+- **Periods**: each section states the exact start and end of the period it covers, e.g. `Aug 10, 2026 12:00 AM GMT-6 to Aug 11, 2026 12:00 AM GMT-6`, rather than just saying "yesterday." Times are always shown on a fixed GMT-6 offset, regardless of where or when the GitHub Actions runner executes — this is independent of the DST-adjusted Mountain Time cron schedule described in [Scheduled run](#scheduled-run) below.
+- **Yesterday's Usage**: the full prior calendar day, midnight to midnight, GMT-6.
+- **This Month's Usage**: month-to-date, from midnight GMT-6 on the 1st of the current month through the moment the report ran.
 
 ## Run locally
 
