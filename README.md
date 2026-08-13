@@ -1,5 +1,7 @@
 # OpenAI Usage Reporter
 
+**Version:** 1.1.0 — see [CHANGELOG.md](CHANGELOG.md) for release history.
+
 This project runs a daily OpenAI API usage check and sends an email with the numbers. It uses GitHub Actions as a free scheduler and avoids any extra infrastructure.
 
 Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026/08/05/how-i-built-a-free-daily-openai-usage-email-report/?utm_source=github&utm_medium=referral&utm_campaign=openai-usage-reporter)
@@ -7,6 +9,7 @@ Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026
 ## What it does
 
 - Queries OpenAI's Costs API for yesterday's usage and month-to-date usage.
+- Breaks each total down by API key, so you can see which key is driving cost — resolving key IDs to their human-readable names where possible.
 - Formats a short report (plain text + HTML, with bold section headers) stating the exact date/time period each total covers.
 - Sends the report to a configured email address.
 - Runs on a cron schedule inside GitHub Actions.
@@ -17,6 +20,7 @@ Companion post: [The Daily OpenAI Usage Email Report](https://dvoorhees.com/2026
 .
 ├── report.py
 ├── requirements.txt
+├── CHANGELOG.md
 └── .github/workflows/daily-report.yml
 ```
 
@@ -65,6 +69,7 @@ This project connects to whatever SMTP server you point it at — it isn't tied 
 - **Periods**: each section states the exact start and end of the period it covers, e.g. `Aug 10, 2026 12:00 AM GMT-6 to Aug 11, 2026 12:00 AM GMT-6`, rather than just saying "yesterday." Times are always shown on a fixed GMT-6 offset, regardless of where or when the GitHub Actions runner executes — this is independent of the DST-adjusted Mountain Time cron schedule described in [Scheduled run](#scheduled-run) below.
 - **Yesterday's Usage**: the full prior calendar day, midnight to midnight, GMT-6.
 - **This Month's Usage**: month-to-date, from midnight GMT-6 on the 1st of the current month through the moment the report ran.
+- **By API Key**: each section also lists cost broken down per API key, sorted highest to lowest, using the Costs API's `group_by=api_key_id` support. The script looks up each key's name across all of the org's projects and shows `Name (…last6ofid)`; if a key can't be resolved to a name (or the lookup fails entirely — see [Troubleshooting](#troubleshooting)) it falls back to showing the raw key ID. Cost not attributable to any key (e.g. certain platform-level charges) appears as `Other (no key attribution)`.
 
 ## Run locally
 
@@ -110,6 +115,7 @@ Flip the value in `.github/workflows/daily-report.yml` when the clocks change, o
 If the test run in the Actions tab fails, check the run's log for these common cases:
 
 - **400 or 401 from OpenAI**: `OPENAI_API_KEY` isn't an admin-scoped key. Regular project keys (`sk-proj-...`) can't read `/v1/organization/costs` — generate an admin key from your org's settings and use that instead.
+- **API keys show as raw IDs instead of names**: name resolution calls `/v1/organization/projects` and `/v1/organization/projects/{id}/api_keys` to map key IDs to names. If your admin key's role doesn't have read access to those (or a project temporarily fails to list), the report silently falls back to showing the key ID for that entry rather than failing — this is expected, not a bug.
 - **SMTP authentication error**: double check `EMAIL_PASSWORD` — most providers (Gmail included) require an app password rather than your normal account password. Also confirm `SMTP_PORT` matches your provider (`465` for implicit SSL, `587` for STARTTLS) — a mismatched port produces a connection or auth error rather than a clear "wrong port" message.
 
 ## Tests
