@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import smtplib
 from email.mime.text import MIMEText
@@ -37,9 +38,15 @@ def fetch_cost_results(start_time, end_time, group_by=None):
         response = requests.get(
             "https://api.openai.com/v1/organization/costs",
             headers=headers,
-            params=params
+            params=params,
+            timeout=15
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            print(f"fetch_cost_results: request failed (status={response.status_code}): "
+                  f"{response.text[:300]}", flush=True)
+            raise
         payload = response.json()
 
         for bucket in payload.get("data", []):
@@ -70,6 +77,7 @@ def get_cost_by_key(start_time, end_time):
 def get_api_key_names():
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
     names = {}
+    t0 = time.monotonic()
 
     try:
         projects = []
@@ -81,7 +89,8 @@ def get_api_key_names():
             response = requests.get(
                 "https://api.openai.com/v1/organization/projects",
                 headers=headers,
-                params=params
+                params=params,
+                timeout=15
             )
             response.raise_for_status()
             payload = response.json()
@@ -90,8 +99,14 @@ def get_api_key_names():
                 after = payload.get("last_id")
             else:
                 break
-    except requests.RequestException:
+    except requests.RequestException as e:
+        status = getattr(e.response, "status_code", None)
+        body = getattr(e.response, "text", "")[:300] if e.response is not None else str(e)
+        print(f"[{time.monotonic() - t0:.1f}s] get_api_key_names: failed to list projects "
+              f"(status={status}): {body}", flush=True)
         return names
+
+    print(f"[{time.monotonic() - t0:.1f}s] get_api_key_names: found {len(projects)} project(s)", flush=True)
 
     for project in projects:
         project_id = project.get("id")
@@ -106,7 +121,8 @@ def get_api_key_names():
                 response = requests.get(
                     f"https://api.openai.com/v1/organization/projects/{project_id}/api_keys",
                     headers=headers,
-                    params=params
+                    params=params,
+                    timeout=15
                 )
                 response.raise_for_status()
                 payload = response.json()
@@ -117,9 +133,15 @@ def get_api_key_names():
                     after = payload.get("last_id")
                 else:
                     break
-        except requests.RequestException:
+        except requests.RequestException as e:
+            status = getattr(e.response, "status_code", None)
+            body = getattr(e.response, "text", "")[:300] if e.response is not None else str(e)
+            print(f"[{time.monotonic() - t0:.1f}s] get_api_key_names: failed to list keys for "
+                  f"project {project_id} (status={status}): {body}", flush=True)
             continue
 
+    print(f"[{time.monotonic() - t0:.1f}s] get_api_key_names: done, resolved {len(names)} key name(s) "
+          f"across {len(projects)} project(s)", flush=True)
     return names
 
 def format_key_breakdown(breakdown, key_names):
@@ -186,6 +208,10 @@ def format_report_html(yesterday_total, yesterday_period, yesterday_by_key, mont
 """
 
 def send_email(subject, text_body, html_body):
+    t0 = time.monotonic()
+    def checkpoint(label):
+        print(f"[{time.monotonic() - t0:.1f}s] send_email: {label}", flush=True)
+
     msg = MIMEMultipart('alternative')
     msg['From'] = EMAIL_FROM
     msg['To'] = EMAIL_TO
@@ -193,17 +219,46 @@ def send_email(subject, text_body, html_body):
     msg.attach(MIMEText(text_body, 'plain'))
     msg.attach(MIMEText(html_body, 'html'))
 
-    if SMTP_PORT == 465:
-        server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
-    else:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
-        server.starttls()
+    checkpoint(f"connecting to {SMTP_HOST}:{SMTP_PORT} ({'SMTP_SSL' if SMTP_PORT == 465 else 'SMTP+STARTTLS'})")
+    try:
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=20)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20)
+    except (OSError, smtplib.SMTPException) as e:
+        checkpoint(f"FAILED to connect: {type(e).__name__}: {e}")
+        raise
+    checkpoint("connected")
 
-    server.login(EMAIL_FROM, EMAIL_PASSWORD)
-    server.send_message(msg)
+    if SMTP_PORT != 465:
+        try:
+            server.starttls()
+        except smtplib.SMTPException as e:
+            checkpoint(f"FAILED during STARTTLS: {type(e).__name__}: {e}")
+            raise
+        checkpoint("STARTTLS complete")
+
+    try:
+        server.login(EMAIL_FROM, EMAIL_PASSWORD)
+    except smtplib.SMTPException as e:
+        checkpoint(f"FAILED to log in as {EMAIL_FROM}: {type(e).__name__}: {e}")
+        raise
+    checkpoint("logged in")
+
+    try:
+        server.send_message(msg)
+    except smtplib.SMTPException as e:
+        checkpoint(f"FAILED to send message: {type(e).__name__}: {e}")
+        raise
+    checkpoint("message sent")
+
     server.quit()
 
 def main():
+    t0 = time.monotonic()
+    def checkpoint(label):
+        print(f"[{time.monotonic() - t0:.1f}s] {label}", flush=True)
+
     now = datetime.now(timezone.utc).astimezone(REPORT_TZ)
     today = now.date()
     yesterday = today - timedelta(days=1)
@@ -222,11 +277,16 @@ def main():
     now_ts = int(now.timestamp())
 
     yesterday_total = get_cost(yesterday_start_ts, yesterday_end_ts)
+    checkpoint("got yesterday total")
     month_total = get_cost(month_start_ts, now_ts)
+    checkpoint("got month total")
 
     yesterday_by_key = get_cost_by_key(yesterday_start_ts, yesterday_end_ts)
+    checkpoint("got yesterday by-key breakdown")
     month_by_key = get_cost_by_key(month_start_ts, now_ts)
+    checkpoint("got month by-key breakdown")
     key_names = get_api_key_names()
+    checkpoint(f"resolved {len(key_names)} api key name(s)")
 
     yesterday_period = format_period(yesterday_start, yesterday_end)
     month_period = format_period(month_start_dt, now)
@@ -234,8 +294,9 @@ def main():
     text_body = format_report_text(yesterday_total, yesterday_period, yesterday_by_key, month_total, month_period, month_by_key, key_names, now)
     html_body = format_report_html(yesterday_total, yesterday_period, yesterday_by_key, month_total, month_period, month_by_key, key_names, now)
 
+    checkpoint("report formatted, handing off to send_email")
     send_email("OpenAI API Usage Report", text_body, html_body)
-    print(f"Report sent for {yesterday}")
+    checkpoint(f"Report sent for {yesterday}")
 
 if __name__ == "__main__":
     main()
